@@ -67,3 +67,44 @@ background, then read `rembg.md` to remove it.
 are stubs in this generator — they exit with a clear message. Prefer a frame
 sequence or a primitive-built mesh as a stand-in until you wire the provider
 endpoints against real keys.
+
+## Check what's configured
+
+Before generating, `doctor` reports which providers are usable (key set + SDK
+installed) without needing any key or network:
+
+```bash
+python3 ${GODOGEN_SKILL_DIR}/tools/asset_gen.py doctor
+# {"ok": true, "ready_services": ["xAI Grok"], "providers": [...]}
+```
+
+Use `ready_services` to pick a model that will actually work; if it's empty,
+go straight to procedural stand-ins.
+
+## Estimate cost before spending
+
+Any generation subcommand accepts `--estimate` to print the cost in cents and
+exit **without** calling a provider (no key required). Use it to plan a batch
+before committing spend:
+
+```bash
+python3 ${GODOGEN_SKILL_DIR}/tools/asset_gen.py image --model gemini --size 2K \
+  --prompt x -o x.png --estimate
+# {"ok": true, "cost_cents": 10, "estimate": true, "service": "image"}
+```
+
+## Optional spend ceiling
+
+Set a budget so generations stop once a ceiling is hit (otherwise spending is
+uncapped):
+
+```bash
+python3 ${GODOGEN_SKILL_DIR}/tools/asset_gen.py budget init --cents 500
+python3 ${GODOGEN_SKILL_DIR}/tools/asset_gen.py budget status
+# {"ok": true, "configured": true, "budget_cents": 500, "spent_cents": 0, "remaining_cents": 500}
+```
+
+Once set, every `image`/`gemini` generation is checked against the remaining
+balance and logged. When a request would exceed it, the CLI fails with a clear
+`Budget exceeded` JSON error — the signal to fall back to procedural assets.
+

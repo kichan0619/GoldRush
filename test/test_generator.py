@@ -180,6 +180,286 @@ class AssetGenEnvTest(unittest.TestCase):
         self.assertEqual(self.asset.require_key("GOOGLE_API_KEY", "Gemini"), "sk-real-value")
 
 
+class AssetGenRobustnessTest(unittest.TestCase):
+    """The asset CLI must keep its {ok:false, error} contract under bad input."""
+
+    def setUp(self):
+        self.asset = load_module("asset_gen", ASSET_GEN)
+        self.tmp = Path(tempfile.mkdtemp())
+        self.cwd = os.getcwd()
+        os.chdir(self.tmp)
+
+    def tearDown(self):
+        os.chdir(self.cwd)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run_cli(self, *args):
+        return subprocess.run(
+            [sys.executable, str(ASSET_GEN), *args],
+            capture_output=True, text=True, cwd=self.tmp,
+        )
+
+    def test_corrupt_budget_file_fails_cleanly(self):
+        budget = self.tmp / "assets" / "budget.json"
+        budget.parent.mkdir(parents=True)
+        budget.write_text("{not valid json", encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            self.asset.check_budget(1)
+
+    def test_non_object_budget_file_fails_cleanly(self):
+        budget = self.tmp / "assets" / "budget.json"
+        budget.parent.mkdir(parents=True)
+        budget.write_text("[1, 2, 3]", encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            self.asset.check_budget(1)
+
+    def test_missing_key_emits_json_not_traceback(self):
+        # No XAI_API_KEY -> the CLI must print {ok:false,...} JSON, not crash.
+        env = {k: v for k, v in os.environ.items() if k != "XAI_API_KEY"}
+        result = subprocess.run(
+            [sys.executable, str(ASSET_GEN), "image", "--model", "grok",
+             "--prompt", "a cat", "-o", "out.png"],
+            capture_output=True, text=True, cwd=self.tmp, env=env,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout.strip())
+        self.assertFalse(payload["ok"])
+        self.assertIn("XAI_API_KEY", payload["error"])
+
+    def test_stub_video_returns_structured_error(self):
+        os.environ["XAI_API_KEY"] = "sk-real-value"
+        try:
+            with self.assertRaises(SystemExit):
+                self.asset.gen_video_grok("walk", Path("out.mp4"), Path("ref.png"), 2)
+        finally:
+            os.environ.pop("XAI_API_KEY", None)
+
+
+class BudgetCommandTest(unittest.TestCase):
+    """budget init/status must close the spend-tracking loop end to end."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self, *args):
+        return subprocess.run(
+            [sys.executable, str(ASSET_GEN), *args],
+            capture_output=True, text=True, cwd=self.tmp,
+        )
+
+    def test_status_without_budget_reports_unconfigured(self):
+        out = json.loads(self._run("budget", "status").stdout.strip())
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["configured"])
+
+    def test_init_then_status_roundtrip(self):
+        init = json.loads(self._run("budget", "init", "--cents", "500").stdout.strip())
+        self.assertEqual(init["budget_cents"], 500)
+        self.assertEqual(init["remaining_cents"], 500)
+        self.assertTrue((self.tmp / "assets" / "budget.json").is_file())
+
+        status = json.loads(self._run("budget", "status").stdout.strip())
+        self.assertTrue(status["configured"])
+        self.assertEqual(status["budget_cents"], 500)
+        self.assertEqual(status["spent_cents"], 0)
+
+    def test_init_rejects_negative(self):
+        self.assertNotEqual(self._run("budget", "init", "--cents", "-1").returncode, 0)
+
+    def test_status_reflects_recorded_spend(self):
+        self._run("budget", "init", "--cents", "100")
+        # Simulate a generation having charged the budget.
+        budget = self.tmp / "assets" / "budget.json"
+        data = json.loads(budget.read_text())
+        data["log"].append({"grok": 2})
+        budget.write_text(json.dumps(data))
+        status = json.loads(self._run("budget", "status").stdout.strip())
+        self.assertEqual(status["spent_cents"], 2)
+        self.assertEqual(status["remaining_cents"], 98)
+
+
+class EstimateModeTest(unittest.TestCase):
+    """--estimate prints the cost and exits 0 without any provider call/key."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self, *args):
+        # Strip every provider key so a true estimate can't accidentally call out.
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("XAI_API_KEY", "GOOGLE_API_KEY", "TRIPO3D_API_KEY")}
+        return subprocess.run(
+            [sys.executable, str(ASSET_GEN), *args],
+            capture_output=True, text=True, cwd=self.tmp, env=env,
+        )
+
+    def test_grok_image_estimate(self):
+        r = self._run("image", "--model", "grok", "--prompt", "x", "-o", "o.png", "--estimate")
+        self.assertEqual(r.returncode, 0)
+        out = json.loads(r.stdout.strip())
+        self.assertTrue(out["ok"] and out["estimate"])
+        self.assertEqual(out["cost_cents"], 2)
+
+    def test_gemini_size_estimate(self):
+        r = self._run("image", "--model", "gemini", "--size", "4K",
+                      "--prompt", "x", "-o", "o.png", "--estimate")
+        self.assertEqual(json.loads(r.stdout.strip())["cost_cents"], 15)
+
+    def test_video_duration_estimate(self):
+        r = self._run("video", "--prompt", "x", "--image", "r.png",
+                      "-o", "o.mp4", "--duration", "3", "--estimate")
+        self.assertEqual(json.loads(r.stdout.strip())["cost_cents"], 15)
+
+    def test_glb_estimate(self):
+        r = self._run("glb", "--image", "r.png", "-o", "o.glb", "--estimate")
+        self.assertEqual(json.loads(r.stdout.strip())["cost_cents"], 30)
+
+
+class RetryTest(unittest.TestCase):
+    """with_retry backs off on transient failures and gives up cleanly."""
+
+    def setUp(self):
+        self.asset = load_module("asset_gen", ASSET_GEN)
+
+    def test_retries_then_succeeds(self):
+        class Resp:
+            def __init__(self, status): self.status_code = status
+        calls = {"n": 0}
+
+        def send():
+            calls["n"] += 1
+            return Resp(503) if calls["n"] < 3 else Resp(200)
+
+        resp = self.asset.with_retry(
+            send, is_retryable=lambda r: r.status_code >= 500,
+            base_delay=0, sleep=lambda _: None,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(calls["n"], 3)
+
+    def test_returns_last_response_after_exhausting_attempts(self):
+        class Resp:
+            status_code = 500
+        resp = self.asset.with_retry(
+            lambda: Resp(), is_retryable=lambda r: True,
+            attempts=3, base_delay=0, sleep=lambda _: None,
+        )
+        self.assertEqual(resp.status_code, 500)
+
+    def test_does_not_retry_permanent_failure(self):
+        calls = {"n": 0}
+
+        class Resp:
+            status_code = 400
+
+        def send():
+            calls["n"] += 1
+            return Resp()
+
+        self.asset.with_retry(send, is_retryable=lambda r: r.status_code >= 500,
+                              base_delay=0, sleep=lambda _: None)
+        self.assertEqual(calls["n"], 1)
+
+    def test_exception_propagates_after_final_attempt(self):
+        calls = {"n": 0}
+
+        def send():
+            calls["n"] += 1
+            raise ConnectionError("boom")
+
+        with self.assertRaises(ConnectionError):
+            self.asset.with_retry(send, is_retryable=lambda r: False,
+                                  attempts=2, base_delay=0, sleep=lambda _: None)
+        self.assertEqual(calls["n"], 2)
+
+
+class DoctorTest(unittest.TestCase):
+    """doctor probes provider readiness without keys or network, never fatal."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self, extra_env=None):
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("XAI_API_KEY", "GOOGLE_API_KEY", "TRIPO3D_API_KEY")}
+        if extra_env:
+            env.update(extra_env)
+        return subprocess.run(
+            [sys.executable, str(ASSET_GEN), "doctor"],
+            capture_output=True, text=True, cwd=self.tmp, env=env,
+        )
+
+    def test_doctor_exits_zero_with_no_keys(self):
+        r = self._run()
+        self.assertEqual(r.returncode, 0)
+        out = json.loads(r.stdout.strip())
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["ready_services"], [])
+        self.assertEqual({p["service"] for p in out["providers"]},
+                         {"Gemini", "xAI Grok", "Tripo3D"})
+
+    def test_doctor_classifies_key_states(self):
+        r = self._run({"GOOGLE_API_KEY": "your-gemini-api-key-here",
+                       "XAI_API_KEY": "sk-real-value"})
+        states = {p["service"]: p["key"] for p in json.loads(r.stdout.strip())["providers"]}
+        self.assertEqual(states["Gemini"], "placeholder")
+        self.assertEqual(states["xAI Grok"], "set")
+        self.assertEqual(states["Tripo3D"], "missing")
+
+
+class PublishUpdateModeTest(unittest.TestCase):
+    """Re-publishing over an existing repo updates skills but keeps the scaffold."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _publish(self, target: Path):
+        return subprocess.run(
+            ["bash", str(REPO / "publish.sh"), "--agent", "claude", "--out", str(target)],
+            capture_output=True, text=True,
+        )
+
+    def test_rerun_preserves_user_scaffold_edits(self):
+        target = self.tmp / "game"
+        self.assertEqual(self._publish(target).returncode, 0)
+
+        # Simulate the user having edited a scaffold file after first publish.
+        pkg = target / "package.json"
+        edited = pkg.read_text(encoding="utf-8").replace(
+            '"name": "babylon-game"', '"name": "my-custom-game"', 1
+        )
+        pkg.write_text(edited, encoding="utf-8")
+        marker = target / "src" / "game" / "scene.ts"
+        marker.write_text(marker.read_text(encoding="utf-8") + "\n// my edit\n",
+                          encoding="utf-8")
+
+        # Re-publish: update mode must skip the scaffold (package.json present).
+        result = self._publish(target)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("update mode", result.stdout)
+
+        # User edits survive.
+        self.assertIn("my-custom-game", pkg.read_text(encoding="utf-8"))
+        self.assertIn("// my edit", marker.read_text(encoding="utf-8"))
+
+        # Skills are still (re)rendered and present.
+        skill = target / ".claude/skills/godogen/SKILL.md"
+        self.assertTrue(skill.is_file())
+        self.assertNotIn("${AGENT_NAME}", skill.read_text(encoding="utf-8"))
+
+
 class PublishEndToEndTest(unittest.TestCase):
     """Run the real publish.sh and assert the produced game repo is correct."""
 
