@@ -1,5 +1,13 @@
 # godogen-babylon
 
+[![CI](https://github.com/kichan0619/GoldRush/actions/workflows/ci.yml/badge.svg)](https://github.com/kichan0619/GoldRush/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+> **What this is:** a *generator* that produces Babylon.js browser games with
+> Claude Code — **not a game itself**. Opening this repo shows skills, a
+> publish script, and a project scaffold; the playable game appears in a
+> separate repo you publish into. Flow: **godogen-babylon → game repo → game**.
+
 Autonomous **Babylon.js** browser-game development with **Claude Code**.
 
 Describe a game in natural language. The agent plans it, scaffolds a Vite +
@@ -7,14 +15,25 @@ Babylon.js project, (optionally) generates art assets, runs the game in a real
 browser, captures screenshots, and fixes what looks wrong — judging progress
 from frames, not from "the code compiled".
 
-This repo is **not a game**. It is the source for a generator that produces
-game repos: **godogen-babylon → game repo → game**. You publish the skills into
-a fresh game repo, then run the agent inside that repo to build the actual game.
+You publish the skills into a fresh game repo, then run the agent inside that
+repo to build the actual game.
 
-> Modeled on [htdt/godogen](https://github.com/htdt/godogen). This is a focused
-> re-implementation scoped to one engine (Babylon.js) and one host agent
-> (Claude Code). All API keys are placeholders you fill in yourself — see
-> [`.env.example`](.env.example).
+## Attribution & scope
+
+This is an independent re-implementation **modeled on
+[htdt/godogen](https://github.com/htdt/godogen)** (MIT). Godogen is a
+multi-engine (Godot / Bevy / Babylon.js), multi-agent (Claude Code / Codex)
+system; this project deliberately narrows that to **one engine (Babylon.js)**
+and **one host agent (Claude Code)** to keep it small and fully runnable on
+commodity hardware. The pipeline design (publish-time skill rendering, staged
+generation, frame-grounded self-repair, the optional Telegram stop hook)
+follows Godogen's approach; the code here was written from scratch. See
+[`LICENSE`](LICENSE).
+
+**Honest scope:** the `video` and `glb` asset subcommands are documented stubs
+(they print their cost model and exit) — wire them to a provider when you have
+keys to test against. Everything else runs end to end. All API keys are
+placeholders you fill in yourself — see [`.env.example`](.env.example).
 
 ## Source layout
 
@@ -95,6 +114,20 @@ Then open the repo in Claude Code and run:
 
 The agent reads the pipeline stages on demand and iterates against the live
 browser at `http://127.0.0.1:5173`.
+
+## Testing
+
+The generator has a stdlib-only test suite (no pip deps) covering template
+rendering, the Claude stop-hook merge, frontmatter injection, `.env` loading +
+placeholder rejection, and a real end-to-end `publish.sh` run:
+
+```bash
+python3 -m unittest discover -s test -v
+```
+
+CI (GitHub Actions) runs these on every push, then publishes a game repo from
+the generator and verifies the scaffold type-checks (`npm run check`) and
+builds (`npm run build`).
 
 ## Improving the skills
 
