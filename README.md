@@ -20,15 +20,14 @@ repo to build the actual game.
 
 ## Attribution & scope
 
-This is an independent re-implementation **modeled on
-[htdt/godogen](https://github.com/htdt/godogen)** (MIT). Godogen is a
-multi-engine (Godot / Bevy / Babylon.js), multi-agent (Claude Code / Codex)
-system; this project deliberately narrows that to **one engine (Babylon.js)**
-and **one host agent (Claude Code)** to keep it small and fully runnable on
-commodity hardware. The pipeline design (publish-time skill rendering, staged
-generation, frame-grounded self-repair, the optional Telegram stop hook)
-follows Godogen's approach; the code here was written from scratch. See
-[`LICENSE`](LICENSE).
+This is a **derivative work of [htdt/godogen](https://github.com/htdt/godogen)**
+(MIT), adapted from its Babylon.js slice. Godogen is a multi-engine (Godot /
+Bevy / Babylon.js), multi-agent (Claude Code / Codex) system; this project takes
+its existing Babylon.js + Claude Code path and narrows the repo to just that, by
+removing the Godot, Bevy, and Codex support. The publish pipeline, scaffold,
+skills, and asset tooling originate upstream and are reused here (copied or
+lightly modified), as the MIT license permits with attribution retained. See
+[`LICENSE`](LICENSE). For the full multi-engine system, use upstream Godogen.
 
 **Honest scope:** the `video` and `glb` asset subcommands are documented stubs
 (they print their cost model and exit) — wire them to a provider when you have
@@ -106,6 +105,15 @@ npm run setup            # optional: interactively enter asset-gen API keys
 You can also `cp .env.example .env` and edit by hand. All keys are optional —
 without them the pipeline falls back to procedural assets.
 
+To check what's configured (keys + SDKs, none required):
+
+```bash
+python3 .claude/skills/godogen/tools/asset_gen.py doctor
+```
+
+It reports each provider as `missing` / `placeholder` / `set` and whether its
+SDK is installed, so you can see at a glance which generators are live.
+
 Then open the repo in Claude Code and run:
 
 ```
@@ -119,7 +127,9 @@ browser at `http://127.0.0.1:5173`.
 
 The generator has a stdlib-only test suite (no pip deps) covering template
 rendering, the Claude stop-hook merge, frontmatter injection, `.env` loading +
-placeholder rejection, and a real end-to-end `publish.sh` run:
+placeholder rejection, the asset CLI's error contract (corrupt budget files,
+missing keys, network retry/backoff), the `budget`, `--estimate`, and `doctor`
+commands, and real end-to-end `publish.sh` runs (first publish + update mode):
 
 ```bash
 python3 -m unittest discover -s test -v

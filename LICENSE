@@ -22,8 +22,14 @@ SOFTWARE.
 
 ---
 
-This project is a re-implementation modeled on Godogen (https://github.com/htdt/godogen),
-also MIT-licensed, Copyright (c) htdt. The pipeline design (publish-time skill
-rendering, staged generation, frame-grounded self-repair, the Telegram stop
-hook) follows Godogen's approach; the code here was written independently and
-scoped to a single engine (Babylon.js) and host agent (Claude Code).
+This project is a derivative work of Godogen (https://github.com/htdt/godogen),
+also MIT-licensed:
+
+    Copyright (c) htdt
+
+It is adapted from Godogen's Babylon.js slice: the publish pipeline, scaffold,
+skills, and asset tooling originate in the upstream project and were reused
+here, then scoped down to a single engine (Babylon.js) and a single host agent
+(Claude Code) by removing the Godot, Bevy, and Codex support. Substantial
+portions of the code are copied or lightly modified from upstream, which the
+MIT license permits provided this notice and the copyright above are retained.
