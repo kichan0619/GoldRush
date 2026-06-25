@@ -1,16 +1,25 @@
-# Secrets — never commit real keys
+# Secrets — never commit real keys, anywhere in the tree.
 .env
 .env.local
+**/.env
+!**/.env.example
 
 # Node
 node_modules/
 dist/
+**/dist/
 *.log
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+
+# godoplat runtime data (db + per-job artifacts)
+godoplat/data/godoplat.db
+godoplat/data/godoplat.db-*
+godoplat/data/jobs/
+godoplat/web/tsconfig.tsbuildinfo
 
 # Generation artifacts in published game repos
 screenshots/

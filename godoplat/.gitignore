@@ -1,0 +1,13 @@
+node_modules/
+dist/
+web/dist/
+web/node_modules/
+data/godoplat.db
+data/godoplat.db-*
+data/jobs/
+*.log
+# Secrets: never commit any .env (root or nested). .env.example is allowed.
+.env
+**/.env
+!**/.env.example
+.DS_Store

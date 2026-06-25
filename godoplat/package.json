@@ -1,0 +1,32 @@
+{
+  "name": "godoplat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GoldRush Studio — hosted platform that turns a prompt into a playable Babylon.js game via godogen-babylon",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:server": "tsc -p tsconfig.json",
+    "build:web": "npm --prefix web install && npm --prefix web run build",
+    "build:all": "npm run build:server && npm run build:web",
+    "start": "node dist/server/index.js",
+    "dev": "tsx watch src/server/index.ts",
+    "worker": "tsx src/worker/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --import tsx \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "better-sqlite3": "^11.3.0",
+    "fastify": "^4.28.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

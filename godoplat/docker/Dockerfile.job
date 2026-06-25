@@ -1,0 +1,53 @@
+# Job sandbox image for GoldRush Studio.
+#
+# One container per generation job. It bakes the godogen-babylon generator at a
+# pinned state and everything needed to run it headlessly: node, Chrome (for
+# playwright capture), ffmpeg (webm->mp4), xvfb (displayless capture), and the
+# Claude Code CLI (drives the autonomous build).
+#
+# Build context must be the parent dir that contains BOTH godogen-babylon and
+# godoplat, e.g. from /Users/xuguichun/Downloads/test1:
+#   docker build -f godoplat/docker/Dockerfile.job -t godoplat-job:latest .
+#
+# SECURITY: no secrets are baked in. ANTHROPIC_API_KEY is passed at run time as
+# a container env var only; it is never written into the generated game repo.
+
+FROM node:20-bookworm-slim
+
+# --- System deps + Chromium (playwright-core launches the system browser) ----
+# Debian's `chromium` package works on BOTH amd64 and arm64 (Apple Silicon),
+# unlike google-chrome which ships no arm64 Linux build.
+#
+# Point apt at a CN mirror (Aliyun) so the layer fetches reliably from networks
+# where deb.debian.org is slow/blocked. bookworm uses the deb822 sources file at
+# /etc/apt/sources.list.d/debian.sources.
+RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates dumb-init ffmpeg xvfb chromium \
+      fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+      libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 libnspr4 libnss3 \
+      libpango-1.0-0 libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+      libxkbcommon0 libxrandr2 \
+ && rm -rf /var/lib/apt/lists/*
+ENV CHROME_BIN=/usr/bin/chromium
+ENV GOOGLE_CHROME_BIN=/usr/bin/chromium
+
+# --- Claude Code CLI ---------------------------------------------------------
+# Use a CN npm mirror so the global install resolves on restricted networks.
+RUN npm install -g --registry=https://registry.npmmirror.com @anthropic-ai/claude-code
+
+# --- Bake the generator (pinned by whatever the build context contains) ------
+# Copied read-only into /gen; the entrypoint copies it to a writable /work.
+COPY godogen-babylon /gen
+
+# --- Entrypoint --------------------------------------------------------------
+COPY godoplat/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Non-root user for the job. Chrome runs with --no-sandbox (set by capture.mjs),
+# so the container boundary is the only isolation — never run this privileged.
+RUN useradd -m runner && mkdir -p /work /game && chown -R runner:runner /work /game
+USER runner
+WORKDIR /work
+
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/entrypoint.sh"]
