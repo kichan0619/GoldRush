@@ -84,18 +84,20 @@ async function runJob(job: Job): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[worker] running job ${job.id}: ${job.prompt}`);
 
-  // BYOK: the caller's Anthropic key was stashed in memory by the server. Take
-  // it (which also deletes it). If it's gone — e.g. the process restarted after
-  // this job was queued — we can't run, so fail with a clear, actionable message.
-  const apiKey = takeKey(job.id);
-  if (!apiKey) {
+  // BYOK: the caller's Anthropic credentials were stashed in memory by the
+  // server. Take them (which also deletes them). If gone — e.g. the process
+  // restarted after this job was queued — we can't run, so fail with a clear,
+  // actionable message.
+  const cred = takeKey(job.id);
+  if (!cred) {
     finalize(
       job.id,
       "failed",
-      "Anthropic key 不可用（服务可能重启过，内存中的 key 已丢失）。请重新提交。",
+      "Anthropic 凭据不可用（服务可能重启过，内存中的 key 已丢失）。请重新提交。",
     );
     return;
   }
+  const { apiKey, baseUrl } = cred;
 
   const containerName = `godoplat-${job.id.slice(0, 8)}`;
   patchJob(job.id, { containerId: containerName });
@@ -109,6 +111,12 @@ async function runJob(job: Job): Promise<void> {
     containerName,
     env: {
       ANTHROPIC_API_KEY: apiKey,
+      // Forward a custom endpoint (relay / 中转站) when provided. Relays vary in
+      // which auth var they read, so when a base URL is set we also pass
+      // ANTHROPIC_AUTH_TOKEN (same value) to cover both conventions.
+      ...(baseUrl
+        ? { ANTHROPIC_BASE_URL: baseUrl, ANTHROPIC_AUTH_TOKEN: apiKey }
+        : {}),
       GODOPLAT_PROMPT: job.prompt,
       GODOPLAT_MAX_TURNS: String(config.maxTurns),
       ...config.assetKeys,

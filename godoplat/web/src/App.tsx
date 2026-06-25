@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { type Job, type JobState, PIPELINE, isTerminal } from "./job.js";
 
-async function postJob(prompt: string, apiKey: string): Promise<Job> {
+async function postJob(prompt: string, apiKey: string, baseUrl: string): Promise<Job> {
   const res = await fetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, apiKey }),
+    body: JSON.stringify({ prompt, apiKey, baseUrl: baseUrl || undefined }),
   });
   if (!res.ok) throw new Error((await res.json()).error ?? "failed to create job");
   return res.json();
@@ -36,10 +36,12 @@ const STAGE_LABEL: Record<JobState, string> = {
 // BYOK: the key is kept only in sessionStorage (cleared when the tab closes),
 // never localStorage, and is sent per-job. The server holds it in memory only.
 const KEY_STORAGE = "goldrush.anthropicKey";
+const BASEURL_STORAGE = "goldrush.baseUrl";
 
 export function App() {
   const [prompt, setPrompt] = useState("");
   const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
+  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(BASEURL_STORAGE) ?? "");
   const [remember, setRemember] = useState(() => !!sessionStorage.getItem(KEY_STORAGE));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [active, setActive] = useState<Job | null>(null);
@@ -79,14 +81,18 @@ export function App() {
   const submit = async () => {
     const p = prompt.trim();
     const k = apiKey.trim();
+    const b = baseUrl.trim();
     if (!p || !k) return;
     // Persist the key for this tab session only if the user opted in.
     if (remember) sessionStorage.setItem(KEY_STORAGE, k);
     else sessionStorage.removeItem(KEY_STORAGE);
+    // Base URL is not a secret; persist it across sessions for convenience.
+    if (b) localStorage.setItem(BASEURL_STORAGE, b);
+    else localStorage.removeItem(BASEURL_STORAGE);
     setSubmitting(true);
     setErr(null);
     try {
-      const job = await postJob(p, k);
+      const job = await postJob(p, k, b);
       setActiveId(job.id);
       setActive(job);
     } catch (e) {
@@ -124,9 +130,24 @@ export function App() {
           />
           <span>在本标签页记住（关闭标签页即清除）</span>
         </label>
+
+        <label style={{ ...S.label, marginTop: 14 }} htmlFor="baseUrl">
+          中转站 / 自定义 Base URL（可选）
+        </label>
+        <input
+          id="baseUrl"
+          type="text"
+          style={S.input}
+          placeholder="https://your-relay.example/v1（留空走 Anthropic 官方）"
+          value={baseUrl}
+          autoComplete="off"
+          onChange={(e) => setBaseUrl(e.target.value)}
+        />
+
         <p style={S.keyNote}>
           用你自己的 key（BYOK）。它只用于本次生成、仅在内存中临时保存，
           不写入数据库、不落盘、不进日志，也不会出现在生成的游戏里。
+          若你用第三方中转站，把它的 Base URL 填上即可。
         </p>
 
         <textarea

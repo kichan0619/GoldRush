@@ -71,4 +71,9 @@ export interface CreateJobRequest {
    * persisted `Job` model, never written to SQLite, disk, or logs.
    */
   apiKey: string;
+  /**
+   * Optional custom Anthropic endpoint (relay / 中转站). When set, it is passed
+   * to the generation container as ANTHROPIC_BASE_URL. Also memory-only.
+   */
+  baseUrl?: string;
 }

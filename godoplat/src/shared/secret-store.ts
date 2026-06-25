@@ -1,38 +1,46 @@
 /**
- * In-memory, ephemeral store for caller-supplied Anthropic API keys (BYOK).
+ * In-memory, ephemeral store for caller-supplied Anthropic credentials (BYOK):
+ * the API key and an optional custom base URL (relay / 中转站).
  *
  * The server and worker run in the same process (see src/server/index.ts), so a
- * module-level Map is enough to hand a job's key from the HTTP handler to the
- * worker. The key is taken out (and deleted) when the worker claims the job and
- * is NEVER persisted: not to SQLite, not to disk, not to logs.
+ * module-level Map is enough to hand a job's credentials from the HTTP handler
+ * to the worker. They are taken out (and deleted) when the worker claims the job
+ * and are NEVER persisted: not to SQLite, not to disk, not to logs.
  *
  * Consequence by design: if the process restarts while a job is still queued,
- * its key is gone and the worker fails that job with a "resubmit" message. That
- * is the correct trade-off — we would rather lose a queued job than persist a
- * secret.
+ * its credentials are gone and the worker fails that job with a "resubmit"
+ * message. That is the correct trade-off — we would rather lose a queued job
+ * than persist a secret.
  */
 
-const keys = new Map<string, string>();
+const creds = new Map<string, JobCredentials>();
 
-/** Stash a job's API key. Called by the server right after createJob(). */
-export function putKey(jobId: string, apiKey: string): void {
-  keys.set(jobId, apiKey);
+/** Per-job credentials handed from the HTTP layer to the worker. */
+export interface JobCredentials {
+  apiKey: string;
+  /** Optional custom Anthropic endpoint (e.g. a relay / 中转站). */
+  baseUrl?: string;
 }
 
-/** Retrieve and remove a job's API key. Returns undefined if absent (e.g. the
- *  process restarted after the job was queued). */
-export function takeKey(jobId: string): string | undefined {
-  const k = keys.get(jobId);
-  keys.delete(jobId);
-  return k;
+/** Stash a job's credentials. Called by the server right after createJob(). */
+export function putKey(jobId: string, cred: JobCredentials): void {
+  creds.set(jobId, cred);
 }
 
-/** Drop a job's key without returning it (cleanup on early failure paths). */
+/** Retrieve and remove a job's credentials. Returns undefined if absent (e.g.
+ *  the process restarted after the job was queued). */
+export function takeKey(jobId: string): JobCredentials | undefined {
+  const c = creds.get(jobId);
+  creds.delete(jobId);
+  return c;
+}
+
+/** Drop a job's credentials without returning them (cleanup on early failure). */
 export function dropKey(jobId: string): void {
-  keys.delete(jobId);
+  creds.delete(jobId);
 }
 
-/** Test-only: number of keys currently held. */
+/** Test-only: number of credentials currently held. */
 export function _size(): number {
-  return keys.size;
+  return creds.size;
 }

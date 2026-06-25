@@ -15,6 +15,34 @@ import { startWorker } from "../worker/index.js";
 
 const MAX_PROMPT_LEN = 500;
 
+/** Minimal extension → MIME map for serving built game files under /play. */
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".wasm": "application/wasm",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
+  ".mp3": "audio/mpeg",
+  ".ogg": "audio/ogg",
+  ".wav": "audio/wav",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+};
+
 export function buildServer() {
   const app = Fastify({ logger: true });
 
@@ -22,6 +50,7 @@ export function buildServer() {
   app.post<{ Body: CreateJobRequest }>("/api/jobs", async (req, reply) => {
     const prompt = (req.body?.prompt ?? "").trim();
     const apiKey = (req.body?.apiKey ?? "").trim();
+    const baseUrl = (req.body?.baseUrl ?? "").trim();
     if (!prompt) {
       return reply.code(400).send({ error: "prompt is required" });
     }
@@ -31,11 +60,11 @@ export function buildServer() {
     if (!apiKey) {
       return reply.code(400).send({ error: "Anthropic API key is required (BYOK)" });
     }
-    // The key is held in memory only (secret-store), keyed by job id, and
-    // consumed by the worker. createJob persists the prompt only — the key
-    // never touches SQLite, disk, or logs.
+    // Credentials are held in memory only (secret-store), keyed by job id, and
+    // consumed by the worker. createJob persists the prompt only — the key and
+    // base URL never touch SQLite, disk, or logs.
     const job = createJob(prompt);
-    putKey(job.id, apiKey);
+    putKey(job.id, { apiKey, baseUrl: baseUrl || undefined });
     return reply.code(201).send(job);
   });
 
@@ -74,6 +103,11 @@ export function buildServer() {
       if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
         return reply.code(404).send({ error: "not found" });
       }
+      // Set a correct Content-Type. ES module scripts (Vite output uses
+      // <script type="module">) are blocked by browsers unless served with a
+      // JavaScript MIME type, so an unset/wrong type causes a blank page.
+      const type = MIME[path.extname(resolved).toLowerCase()];
+      if (type) reply.type(type);
       return reply.send(fs.createReadStream(resolved));
     },
   );

@@ -21,9 +21,12 @@ FROM node:20-bookworm-slim
 # Point apt at a CN mirror (Aliyun) so the layer fetches reliably from networks
 # where deb.debian.org is slow/blocked. bookworm uses the deb822 sources file at
 # /etc/apt/sources.list.d/debian.sources.
-RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+# Use http (not https) for the mirror: the base image has no ca-certificates yet
+# at this point, and Debian packages are GPG-signed, so integrity does not depend
+# on TLS. This also avoids TLS interception on locked-down corporate networks.
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g; s|https://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
  && apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates dumb-init ffmpeg xvfb chromium \
+      ca-certificates dumb-init ffmpeg xvfb xauth chromium rsync python3 \
       fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
       libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 libnspr4 libnss3 \
       libpango-1.0-0 libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
@@ -31,6 +34,11 @@ RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sourc
  && rm -rf /var/lib/apt/lists/*
 ENV CHROME_BIN=/usr/bin/chromium
 ENV GOOGLE_CHROME_BIN=/usr/bin/chromium
+
+# Route ALL npm installs (the global CLI below AND the generated game's
+# `npm install` at run time) through a CN mirror, so dependency fetches resolve
+# on restricted networks. Applies to every npm invocation via env.
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
 # --- Claude Code CLI ---------------------------------------------------------
 # Use a CN npm mirror so the global install resolves on restricted networks.

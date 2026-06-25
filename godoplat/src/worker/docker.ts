@@ -45,6 +45,20 @@ export function runContainer(opts: RunOptions): RunHandle {
     "--security-opt",
     "no-new-privileges",
   ];
+  // Isolate the job from any host-level proxy the Docker daemon injects
+  // (e.g. ~/.docker/config.json proxies). The sandbox does its own networking —
+  // direct fetches for npm/apt plus the caller's relay — so a stale host proxy
+  // must not leak in. Explicit empty values override the daemon-injected ones.
+  for (const k of [
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "all_proxy",
+    "ALL_PROXY",
+  ]) {
+    args.push("-e", `${k}=`);
+  }
   for (const [k, v] of Object.entries(opts.env)) {
     if (v) args.push("-e", `${k}=${v}`);
   }
