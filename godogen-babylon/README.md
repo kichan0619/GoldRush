@@ -1,12 +1,14 @@
-# godogen-babylon
+# godogen-babylon — the generation engine
 
 [![CI](https://github.com/kichan0619/GoldRush/actions/workflows/ci.yml/badge.svg)](https://github.com/kichan0619/GoldRush/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **What this is:** a *generator* that produces Babylon.js browser games with
-> Claude Code — **not a game itself**. Opening this repo shows skills, a
-> publish script, and a project scaffold; the playable game appears in a
-> separate repo you publish into. Flow: **godogen-babylon → game repo → game**.
+> **The engine that powers [GoldRush Studio](../README.md).** This is the
+> *generator*: the Claude Code skill set, publish pipeline, and Vite + Babylon.js
+> scaffold that turn a natural-language prompt into a working browser game. The
+> Studio platform (`../godoplat`) runs this engine headlessly in a sandbox so a
+> prompt becomes a playable game in the browser; you can also run it directly in
+> Claude Code. Flow: **godogen-babylon → game repo → game**.
 
 Autonomous **Babylon.js** browser-game development with **Claude Code**.
 
@@ -18,16 +20,18 @@ from frames, not from "the code compiled".
 You publish the skills into a fresh game repo, then run the agent inside that
 repo to build the actual game.
 
-## Attribution & scope
+## Credits & scope
 
-This is a **derivative work of [htdt/godogen](https://github.com/htdt/godogen)**
-(MIT), adapted from its Babylon.js slice. Godogen is a multi-engine (Godot /
-Bevy / Babylon.js), multi-agent (Claude Code / Codex) system; this project takes
-its existing Babylon.js + Claude Code path and narrows the repo to just that, by
-removing the Godot, Bevy, and Codex support. The publish pipeline, scaffold,
-skills, and asset tooling originate upstream and are reused here (copied or
-lightly modified), as the MIT license permits with attribution retained. See
-[`LICENSE`](LICENSE). For the full multi-engine system, use upstream Godogen.
+The Babylon.js + Claude Code generation pipeline here builds on
+[htdt/godogen](https://github.com/htdt/godogen) (MIT) — an excellent multi-engine
+(Godot / Bevy / Babylon.js), multi-agent (Claude Code / Codex) system. This repo
+focuses that lineage on a single, deeply-supported target (Babylon.js + Claude),
+and **GoldRush Studio builds a self-hosted, bring-your-own-key web platform on top
+of it** (see [`../godoplat`](../godoplat)) — turning the CLI generator into a
+one-prompt-to-playable-game service, which is not part of upstream. The publish
+pipeline, scaffold, skills, and asset tooling originate upstream and are reused
+here under MIT with attribution retained (see [`LICENSE`](LICENSE)). For the full
+multi-engine CLI, use upstream Godogen; for the hosted platform, use this repo.
 
 **Honest scope:** the `video` and `glb` asset subcommands are documented stubs
 (they print their cost model and exit) — wire them to a provider when you have

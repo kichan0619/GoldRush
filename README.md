@@ -1,15 +1,36 @@
-# GoldRush
+# GoldRush Studio
 
-A monorepo with two pieces that fit together:
+**Type a sentence. Get a playable Babylon.js game in your browser.**
+
+GoldRush Studio is a self-hosted, **bring-your-own-key** web platform that turns
+a natural-language prompt into a real, playable 3D browser game. You describe the
+game; it plans, writes, builds, and visually self-corrects the game inside a
+sandboxed container, then hands you back something you can play and share — no
+game-dev or coding required.
+
+Under the hood it pairs two pieces:
 
 | Directory | What it is |
 | --- | --- |
-| [`godogen-babylon/`](godogen-babylon) | The **generator** — a Claude Code skill set + scaffold that autonomously builds a Babylon.js browser game from a natural-language prompt. Runs locally in Claude Code. A derivative of [htdt/godogen](https://github.com/htdt/godogen) (MIT), narrowed to the Babylon.js + Claude path. |
-| [`godoplat/`](godoplat) | **GoldRush Studio** — a self-hosted web platform that wraps the generator: type a prompt in a browser, and it runs the generator headlessly in a Docker sandbox and gives you back a playable game. |
+| [`godoplat/`](godoplat) | **GoldRush Studio** — the web platform. Prompt in a browser → queued job → headless generation in a Docker sandbox → playable game served back at `/play/<id>/`, with a gallery and share links. Bring-your-own-key, memory-only. |
+| [`godogen-babylon/`](godogen-babylon) | **The generation engine** — the Claude Code skill set + Vite/Babylon.js scaffold that actually builds each game. Usable on its own in Claude Code; built on [htdt/godogen](https://github.com/htdt/godogen) (MIT). |
 
-If you just want the CLI generator, use `godogen-babylon/` on its own. If you
-want the one-prompt-to-playable-game web app, use `godoplat/` (it builds the
-generator into its sandbox image).
+Want the hosted, one-prompt-to-playable-game experience? Use `godoplat/`. Just
+want the CLI generator? Use `godogen-babylon/` on its own.
+
+## Demo
+
+> **Add real captures here.** Every generation job already produces them
+> automatically (the capture step writes a screenshot + video). After your first
+> successful run, drop two files into [`docs/`](docs/) and they'll render below:
+>
+> - `docs/demo-pipeline.png` — the Studio UI mid-run (prompt + live pipeline)
+> - `docs/demo-game.gif` — a finished game playing in the browser
+>
+> Then replace this callout with:
+> `![Studio](docs/demo-pipeline.png)` and `![Game](docs/demo-game.gif)`.
+
+> _Suggested first prompt:_ `a small low-poly kart racer with 3 laps and a lap timer`
 
 ## Bring Your Own Key (BYOK)
 
