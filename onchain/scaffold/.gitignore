@@ -1,0 +1,20 @@
+# Foundry build artifacts
+out/
+cache/
+broadcast/
+.gas-snapshot
+
+# Solidity dependencies (vendored at publish/build time, e.g. forge install)
+lib/
+
+# Node / Vite
+node_modules/
+dist/
+
+# Local capture output
+screenshots/
+
+# Secrets
+.env
+*.log
+.DS_Store
