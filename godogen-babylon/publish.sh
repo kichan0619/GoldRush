@@ -49,9 +49,18 @@ while [ $# -gt 0 ]; do
 done
 
 case "$ENGINE" in
-    babylon) ;;
-    godot|bevy) echo "error: --engine $ENGINE is not wired up in this generator yet (babylon only)" >&2; exit 1 ;;
-    *) echo "error: --engine must be babylon" >&2; usage; exit 1 ;;
+    babylon)
+        ENGINE_NAME="Babylon"
+        HELP_SKILL="babylon-help"
+        HELP_COMMAND="/babylon-help"
+        ;;
+    onchain)
+        ENGINE_NAME="On-Chain"
+        HELP_SKILL=""          # no engine help skill for the on-chain track (yet)
+        HELP_COMMAND=""
+        ;;
+    godot|bevy) echo "error: --engine $ENGINE is not wired up in this generator yet (babylon, onchain)" >&2; exit 1 ;;
+    *) echo "error: --engine must be babylon or onchain" >&2; usage; exit 1 ;;
 esac
 
 case "$AGENT" in
@@ -61,7 +70,6 @@ case "$AGENT" in
         HOOK_CONFIG_DIR=".claude"
         AGENT_NAME="Claude"
         GODOGEN_COMMAND="/godogen"
-        BABYLON_HELP_COMMAND="/babylon-help"
         ;;
     codex) echo "error: --agent codex is not wired up in this generator yet (claude only)" >&2; exit 1 ;;
     *) echo "error: --agent must be claude" >&2; usage; exit 1 ;;
@@ -89,8 +97,10 @@ mkdir -p "$TMP/skills/godogen"
 rsync -a --exclude='__pycache__/' "$REPO_ROOT/shared/skills/godogen/" "$TMP/skills/godogen/"
 rsync -a --exclude='__pycache__/' "$REPO_ROOT/$ENGINE/skills/godogen/" "$TMP/skills/godogen/"
 
-# Engine help skill (babylon-help).
-rsync -a --exclude='__pycache__/' "$REPO_ROOT/$ENGINE/skills/babylon-help" "$TMP/skills/"
+# Engine help skill (e.g. babylon-help), if this engine ships one.
+if [ -n "$HELP_SKILL" ] && [ -d "$REPO_ROOT/$ENGINE/skills/$HELP_SKILL" ]; then
+    rsync -a --exclude='__pycache__/' "$REPO_ROOT/$ENGINE/skills/$HELP_SKILL" "$TMP/skills/"
+fi
 
 # --- Render template variables across the staged skills ---
 python3 "$HELPERS/render_dir.py" "$TMP/skills" \
@@ -98,14 +108,16 @@ python3 "$HELPERS/render_dir.py" "$TMP/skills" \
     "AGENT_NAME=$AGENT_NAME" \
     "SKILLS_DIR=$SKILLS_DIR_REL" \
     "GODOGEN_SKILL_DIR=$SKILLS_DIR_REL/godogen" \
-    "BABYLON_HELP_SKILL_DIR=$SKILLS_DIR_REL/babylon-help" \
+    "BABYLON_HELP_SKILL_DIR=$SKILLS_DIR_REL/$HELP_SKILL" \
     "HOOK_CONFIG_DIR=$HOOK_CONFIG_DIR" \
-    "ENGINE_NAME=Babylon" \
+    "ENGINE_NAME=$ENGINE_NAME" \
     "GODOGEN_COMMAND=$GODOGEN_COMMAND" \
-    "BABYLON_HELP_COMMAND=$BABYLON_HELP_COMMAND"
+    "BABYLON_HELP_COMMAND=$HELP_COMMAND"
 
-# Claude lookup frontmatter for the reference (non-pipeline) help skill.
-python3 "$HELPERS/inject_claude_lookup_frontmatter.py" "$TMP/skills/babylon-help/SKILL.md"
+# Claude lookup frontmatter for the reference (non-pipeline) help skill, if present.
+if [ -n "$HELP_SKILL" ] && [ -f "$TMP/skills/$HELP_SKILL/SKILL.md" ]; then
+    python3 "$HELPERS/inject_claude_lookup_frontmatter.py" "$TMP/skills/$HELP_SKILL/SKILL.md"
+fi
 
 echo "Publishing $ENGINE/$AGENT to: $TARGET"
 
@@ -113,10 +125,10 @@ echo "Publishing $ENGINE/$AGENT to: $TARGET"
 mkdir -p "$TARGET/$SKILLS_DIR_REL"
 rsync -a --delete "$TMP/skills/" "$TARGET/$SKILLS_DIR_REL/"
 
-# --- Babylon Vite scaffold (only when the target has no package.json yet) ---
+# --- Engine Vite scaffold (only when the target has no package.json yet) ---
 if [ ! -f "$TARGET/package.json" ]; then
     rsync -a "$REPO_ROOT/$ENGINE/scaffold/" "$TARGET/"
-    echo "Created Babylon scaffold"
+    echo "Created $ENGINE_NAME scaffold"
 else
     echo "Existing package.json found — skipped scaffold (update mode)"
 fi
@@ -127,7 +139,8 @@ cp "$REPO_ROOT/$ENGINE/game-engine.md" "$TMP/game/game-engine.md"
 python3 "$HELPERS/render_dir.py" "$TMP/game" \
     "AGENT_NAME=$AGENT_NAME" \
     "GODOGEN_COMMAND=$GODOGEN_COMMAND" \
-    "BABYLON_HELP_COMMAND=$BABYLON_HELP_COMMAND"
+    "ENGINE_NAME=$ENGINE_NAME" \
+    "BABYLON_HELP_COMMAND=$HELP_COMMAND"
 cp "$TMP/game/game-engine.md" "$TARGET/$MANIFEST"
 echo "Created $MANIFEST"
 
