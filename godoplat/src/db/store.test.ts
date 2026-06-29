@@ -37,6 +37,16 @@ test("createJob defaults gameType to babylon; persists onchain when given", () =
   assert.equal(store.getJob(oc.id)!.gameType, "onchain");
 });
 
+test("parentJobId defaults null; persists when editing a prior game", () => {
+  const fresh = store.createJob("make a maze");
+  assert.equal(fresh.parentJobId, null);
+  assert.equal(store.getJob(fresh.id)!.parentJobId, null);
+
+  const edit = store.createJob("make the walls blue", "babylon", fresh.id);
+  assert.equal(edit.parentJobId, fresh.id);
+  assert.equal(store.getJob(edit.id)!.parentJobId, fresh.id);
+});
+
 test("claimNextQueued atomically moves oldest queued -> provisioning", () => {
   const a = store.createJob("first");
   const claimed = store.claimNextQueued();

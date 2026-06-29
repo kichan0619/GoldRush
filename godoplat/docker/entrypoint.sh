@@ -26,6 +26,17 @@ stage provisioning
 log "copying generator to writable /work"
 cp -a /gen/. /work/
 cd /work
+
+# Edit mode: if a parent game's source was mounted at /seed, restore it into
+# /game FIRST. publish.sh then runs in update mode (it skips the scaffold when a
+# package.json already exists), refreshing the skills/manifest while keeping the
+# existing game code — so the agent edits the prior game instead of starting over.
+if [ "${GODOPLAT_EDIT:-0}" = "1" ] && [ -f /seed/source.tar.gz ]; then
+  log "edit mode: restoring parent game source into /game"
+  mkdir -p /game
+  tar -xzf /seed/source.tar.gz -C /game
+fi
+
 log "publishing game repo to /game"
 ./publish.sh --agent claude --out /game
 
@@ -85,6 +96,15 @@ mkdir -p screenshots/result/1
 log "capturing still + video (capture.mjs handles xvfb itself)"
 node scripts/capture.mjs still screenshots/result/1/still.png
 node scripts/capture.mjs video screenshots/result/1 6 || log "video capture failed (non-fatal)"
+
+# Bundle the game SOURCE (minus deps/build/vcs) so the host can persist it and a
+# later edit job can restore it for iterative changes. dist/ and media are copied
+# out separately by the worker.
+log "bundling game source for iterative edits"
+tar -czf /game/source.tar.gz \
+  --exclude=node_modules --exclude=dist --exclude=.git \
+  --exclude=screenshots --exclude=source.tar.gz \
+  -C /game . || log "source bundle failed (non-fatal)"
 
 stage done
 log "pipeline complete"

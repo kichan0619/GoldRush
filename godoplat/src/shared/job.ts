@@ -57,6 +57,8 @@ export interface Job {
   prompt: string;
   /** Which engine produced this job (defaults to babylon for back-compat). */
   gameType: GameType;
+  /** If set, this job edits a prior job's game (iterative refinement). */
+  parentJobId: string | null;
   state: JobState;
   createdAt: number;
   startedAt: number | null;
@@ -90,4 +92,7 @@ export interface CreateJobRequest {
   baseUrl?: string;
   /** Which engine to target. Defaults to "babylon" when omitted. */
   gameType?: GameType;
+  /** If set, edit an existing finished game (its source is restored and the
+   *  prompt is applied as a change) instead of generating from scratch. */
+  parentJobId?: string;
 }

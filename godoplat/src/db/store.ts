@@ -27,6 +27,7 @@ export function getDb(): Database.Database {
       id           TEXT PRIMARY KEY,
       prompt       TEXT NOT NULL,
       gameType     TEXT NOT NULL DEFAULT 'babylon',
+      parentJobId  TEXT,
       state        TEXT NOT NULL,
       createdAt    INTEGER NOT NULL,
       startedAt    INTEGER,
@@ -41,10 +42,13 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
     CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(createdAt);
   `);
-  // Migration for DBs created before gameType existed: add the column if missing.
+  // Migrations for DBs created before these columns existed.
   const cols = db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[];
   if (!cols.some((c) => c.name === "gameType")) {
     db.exec(`ALTER TABLE jobs ADD COLUMN gameType TEXT NOT NULL DEFAULT 'babylon'`);
+  }
+  if (!cols.some((c) => c.name === "parentJobId")) {
+    db.exec(`ALTER TABLE jobs ADD COLUMN parentJobId TEXT`);
   }
   return db;
 }
@@ -54,6 +58,7 @@ function rowToJob(row: Record<string, unknown>): Job {
     id: row.id as string,
     prompt: row.prompt as string,
     gameType: ((row.gameType as string) ?? DEFAULT_GAME_TYPE) as GameType,
+    parentJobId: (row.parentJobId as string) ?? null,
     state: row.state as JobState,
     createdAt: row.createdAt as number,
     startedAt: (row.startedAt as number) ?? null,
@@ -67,11 +72,16 @@ function rowToJob(row: Record<string, unknown>): Job {
   };
 }
 
-export function createJob(prompt: string, gameType: GameType = DEFAULT_GAME_TYPE): Job {
+export function createJob(
+  prompt: string,
+  gameType: GameType = DEFAULT_GAME_TYPE,
+  parentJobId: string | null = null,
+): Job {
   const job: Job = {
     id: randomUUID(),
     prompt,
     gameType,
+    parentJobId,
     state: "queued",
     createdAt: Date.now(),
     startedAt: null,
@@ -85,12 +95,13 @@ export function createJob(prompt: string, gameType: GameType = DEFAULT_GAME_TYPE
   };
   getDb()
     .prepare(
-      `INSERT INTO jobs (id, prompt, gameType, state, createdAt) VALUES (@id, @prompt, @gameType, @state, @createdAt)`,
+      `INSERT INTO jobs (id, prompt, gameType, parentJobId, state, createdAt) VALUES (@id, @prompt, @gameType, @parentJobId, @state, @createdAt)`,
     )
     .run({
       id: job.id,
       prompt: job.prompt,
       gameType: job.gameType,
+      parentJobId: job.parentJobId,
       state: job.state,
       createdAt: job.createdAt,
     });

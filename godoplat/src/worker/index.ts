@@ -109,9 +109,17 @@ async function runJob(job: Job): Promise<void> {
   // The on-chain engine needs a Foundry-equipped image; babylon uses the default.
   const image = job.gameType === "onchain" ? config.onchainJobImage : config.jobImage;
 
+  // Edit mode: mount the parent game's stored source read-only at /seed; the
+  // entrypoint restores it into /game so the agent edits the existing game.
+  const editing = !!job.parentJobId;
+  const readonlyMount = editing
+    ? { hostPath: jobDir(job.parentJobId as string), containerPath: "/seed" }
+    : undefined;
+
   const handle = runContainer({
     image,
     containerName,
+    readonlyMount,
     env: {
       ANTHROPIC_API_KEY: apiKey,
       // Forward a custom endpoint (relay / 中转站) when provided. Relays vary in
@@ -122,6 +130,7 @@ async function runJob(job: Job): Promise<void> {
         : {}),
       GODOPLAT_PROMPT: job.prompt,
       GODOPLAT_ENGINE: job.gameType,
+      ...(editing ? { GODOPLAT_EDIT: "1" } : {}),
       GODOPLAT_MAX_TURNS: String(config.maxTurns),
       ...config.assetKeys,
     },
@@ -184,7 +193,9 @@ async function runJob(job: Job): Promise<void> {
   finalizeDone(job.id);
 }
 
-/** Copy dist/ and capture media out of the container into host job storage. */
+/** Copy dist/, media, and the source bundle out of the container into host job
+ *  storage. The source bundle (source.tar.gz) lets a later edit job restore this
+ *  game and iterate on it. */
 function extractArtifacts(containerName: string, id: string): boolean {
   fs.mkdirSync(jobDir(id), { recursive: true });
   copyOut(containerName, "/game/dist", jobDir(id)); // creates dist/ under jobDir
@@ -193,6 +204,8 @@ function extractArtifacts(containerName: string, id: string): boolean {
   // Capture writes video.webm, optionally transcoded to video.mp4.
   copyOut(containerName, "/game/screenshots/result/1/video.mp4", path.join(jobMediaDir(id), "video.mp4"));
   copyOut(containerName, "/game/screenshots/result/1/video.webm", path.join(jobMediaDir(id), "video.webm"));
+  // Source bundle for iterative edits (best-effort; absence just disables editing).
+  copyOut(containerName, "/game/source.tar.gz", path.join(jobDir(id), "source.tar.gz"));
 
   const index = path.join(jobDistDir(id), "index.html");
   return fs.existsSync(index);

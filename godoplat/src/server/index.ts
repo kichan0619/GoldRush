@@ -62,10 +62,29 @@ export function buildServer() {
       return reply.code(400).send({ error: "Anthropic API key is required (BYOK)" });
     }
     const gameType = isGameType(req.body?.gameType) ? req.body.gameType : DEFAULT_GAME_TYPE;
+
+    // Edit mode: when parentJobId is given, the new job refines an existing game.
+    // Validate the parent is a finished job whose source bundle we still have.
+    let parentJobId: string | null = null;
+    const reqParent = (req.body?.parentJobId ?? "").trim();
+    if (reqParent) {
+      const parent = getJob(reqParent);
+      if (!parent) {
+        return reply.code(400).send({ error: "parentJobId not found" });
+      }
+      if (parent.state !== "done") {
+        return reply.code(400).send({ error: "parent game is not finished" });
+      }
+      if (!fs.existsSync(path.join(jobDir(parent.id), "source.tar.gz"))) {
+        return reply.code(400).send({ error: "parent game has no editable source" });
+      }
+      parentJobId = parent.id;
+    }
+
     // Credentials are held in memory only (secret-store), keyed by job id, and
-    // consumed by the worker. createJob persists prompt + gameType only — the key
-    // and base URL never touch SQLite, disk, or logs.
-    const job = createJob(prompt, gameType);
+    // consumed by the worker. createJob persists prompt + gameType + parentJobId
+    // only — the key and base URL never touch SQLite, disk, or logs.
+    const job = createJob(prompt, gameType, parentJobId);
     putKey(job.id, { apiKey, baseUrl: baseUrl || undefined });
     return reply.code(201).send(job);
   });

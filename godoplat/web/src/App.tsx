@@ -108,6 +108,37 @@ export function App() {
     }
   };
 
+  // Iterative edit: submit a follow-up job that refines an existing game.
+  // Reuses the current key/baseUrl/engine; the change is described in plain text.
+  const submitEdit = async (parentJobId: string, editPrompt: string) => {
+    const k = apiKey.trim();
+    const e = editPrompt.trim();
+    if (!k || !e) return;
+    setSubmitting(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: e,
+          apiKey: k,
+          baseUrl: baseUrl.trim() || undefined,
+          gameType,
+          parentJobId,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "failed to submit edit");
+      const job = (await res.json()) as Job;
+      setActiveId(job.id);
+      setActive(job);
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div style={S.page}>
       <header style={S.header}>
@@ -199,7 +230,7 @@ export function App() {
         {err && <div style={S.error}>{err}</div>}
       </section>
 
-      {active && <ActivePanel job={active} />}
+      {active && <ActivePanel job={active} onEdit={submitEdit} editing={submitting} />}
 
       <section>
         <h2 style={S.h2}>画廊</h2>
@@ -226,7 +257,16 @@ export function App() {
   );
 }
 
-function ActivePanel({ job }: { job: Job }) {
+function ActivePanel({
+  job,
+  onEdit,
+  editing,
+}: {
+  job: Job;
+  onEdit: (parentJobId: string, editPrompt: string) => void;
+  editing: boolean;
+}) {
+  const [editPrompt, setEditPrompt] = useState("");
   const currentIdx = PIPELINE.indexOf(job.state);
   const failed = job.state === "failed" || job.state === "timeout";
   return (
@@ -266,6 +306,27 @@ function ActivePanel({ job }: { job: Job }) {
             <ShareLink path={job.gamePath} />
           </div>
           <iframe title="game" src={job.gamePath} style={S.iframe} />
+
+          <div style={S.editBox}>
+            <div style={S.editTitle}>不满意？用一句话继续改：</div>
+            <textarea
+              style={S.textarea}
+              placeholder="例如：把车改成红色 / 加一个跳跃 / 背景换成夜晚"
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              rows={2}
+            />
+            <button
+              style={S.button}
+              disabled={editing || !editPrompt.trim()}
+              onClick={() => {
+                onEdit(job.id, editPrompt);
+                setEditPrompt("");
+              }}
+            >
+              {editing ? "提交中…" : "继续修改"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -325,5 +386,7 @@ const S: Record<string, React.CSSProperties> = {
   stepLabel: { fontSize: 12, marginTop: 6, color: "#555" },
   row: { display: "flex", gap: 10, alignItems: "center", marginBottom: 12 },
   iframe: { width: "100%", height: 480, border: "1px solid #ddd", borderRadius: 8, background: "#000" },
+  editBox: { marginTop: 16, padding: 14, background: "#f1f8e9", border: "1px solid #c5e1a5", borderRadius: 10 },
+  editTitle: { fontSize: 14, fontWeight: 600, color: "#33691e", marginBottom: 8 },
   log: { background: "#1e1e1e", color: "#d4d4d4", padding: 12, borderRadius: 8, fontSize: 12, maxHeight: 240, overflow: "auto", whiteSpace: "pre-wrap" },
 };

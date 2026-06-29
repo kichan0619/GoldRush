@@ -17,6 +17,8 @@ export interface RunOptions {
   memory: string;
   cpus: string;
   pidsLimit: number;
+  /** Optional read-only host dir to mount at a container path (edit-mode seed). */
+  readonlyMount?: { hostPath: string; containerPath: string };
   /** Called for every stdout/stderr line the container emits. */
   onLine: (line: string) => void;
 }
@@ -61,6 +63,11 @@ export function runContainer(opts: RunOptions): RunHandle {
   }
   for (const [k, v] of Object.entries(opts.env)) {
     if (v) args.push("-e", `${k}=${v}`);
+  }
+  // Edit mode: mount the parent game's source read-only as a seed. :ro keeps the
+  // sandbox from mutating host storage.
+  if (opts.readonlyMount) {
+    args.push("-v", `${opts.readonlyMount.hostPath}:${opts.readonlyMount.containerPath}:ro`);
   }
   args.push(opts.image);
 
