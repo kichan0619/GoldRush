@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canTransition, isTerminal, JOB_STATES } from "./job.js";
+import { canTransition, isTerminal, JOB_STATES, isGameType, DEFAULT_GAME_TYPE } from "./job.js";
+
+test("isGameType: accepts known engines, rejects others", () => {
+  assert.equal(isGameType("babylon"), true);
+  assert.equal(isGameType("onchain"), true);
+  assert.equal(isGameType("godot"), false);
+  assert.equal(isGameType(""), false);
+  assert.equal(isGameType(undefined), false);
+  assert.equal(isGameType(123), false);
+});
+
+test("DEFAULT_GAME_TYPE is babylon (back-compat)", () => {
+  assert.equal(DEFAULT_GAME_TYPE, "babylon");
+});
 
 test("isTerminal: only done/failed/timeout are terminal", () => {
   assert.equal(isTerminal("done"), true);

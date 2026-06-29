@@ -27,6 +27,8 @@ export const config = {
   port: Number(process.env.PORT ?? 8080),
   /** Docker image tag for the job sandbox. */
   jobImage: process.env.GODOPLAT_JOB_IMAGE ?? "godoplat-job:latest",
+  /** Docker image tag for the on-chain job sandbox (Foundry-equipped). */
+  onchainJobImage: process.env.GODOPLAT_ONCHAIN_JOB_IMAGE ?? "godoplat-job-onchain:latest",
   /** Whole-container wall-clock ceiling (ms). Worker kills past this. */
   jobTimeoutMs: Number(process.env.GODOPLAT_JOB_TIMEOUT_MS ?? 20 * 60 * 1000),
   /** Agent iteration cap passed to `claude --max-turns`. */

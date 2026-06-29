@@ -10,6 +10,7 @@ import {
   reapOrphans,
 } from "../db/store.js";
 import type { CreateJobRequest } from "../shared/job.js";
+import { isGameType, DEFAULT_GAME_TYPE } from "../shared/job.js";
 import { putKey } from "../shared/secret-store.js";
 import { startWorker } from "../worker/index.js";
 
@@ -60,10 +61,11 @@ export function buildServer() {
     if (!apiKey) {
       return reply.code(400).send({ error: "Anthropic API key is required (BYOK)" });
     }
+    const gameType = isGameType(req.body?.gameType) ? req.body.gameType : DEFAULT_GAME_TYPE;
     // Credentials are held in memory only (secret-store), keyed by job id, and
-    // consumed by the worker. createJob persists the prompt only — the key and
-    // base URL never touch SQLite, disk, or logs.
-    const job = createJob(prompt);
+    // consumed by the worker. createJob persists prompt + gameType only — the key
+    // and base URL never touch SQLite, disk, or logs.
+    const job = createJob(prompt, gameType);
     putKey(job.id, { apiKey, baseUrl: baseUrl || undefined });
     return reply.code(201).send(job);
   });

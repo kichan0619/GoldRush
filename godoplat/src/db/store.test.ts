@@ -26,6 +26,17 @@ test("createJob inserts a queued job without persisting any key", () => {
   assert.equal(fetched!.prompt, "make a platformer");
 });
 
+test("createJob defaults gameType to babylon; persists onchain when given", () => {
+  const def = store.createJob("default engine");
+  assert.equal(def.gameType, "babylon");
+  assert.equal(store.getJob(def.id)!.gameType, "babylon");
+
+  const oc = store.createJob("a tic-tac-toe on chain", "onchain");
+  assert.equal(oc.gameType, "onchain");
+  // Survives a round-trip through SQLite.
+  assert.equal(store.getJob(oc.id)!.gameType, "onchain");
+});
+
 test("claimNextQueued atomically moves oldest queued -> provisioning", () => {
   const a = store.createJob("first");
   const claimed = store.claimNextQueued();

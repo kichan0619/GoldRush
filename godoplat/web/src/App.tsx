@@ -1,11 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
 import { type Job, type JobState, PIPELINE, isTerminal } from "./job.js";
 
-async function postJob(prompt: string, apiKey: string, baseUrl: string): Promise<Job> {
+async function postJob(
+  prompt: string,
+  apiKey: string,
+  baseUrl: string,
+  gameType: string,
+): Promise<Job> {
   const res = await fetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, apiKey, baseUrl: baseUrl || undefined }),
+    body: JSON.stringify({ prompt, apiKey, baseUrl: baseUrl || undefined, gameType }),
   });
   if (!res.ok) throw new Error((await res.json()).error ?? "failed to create job");
   return res.json();
@@ -40,6 +45,7 @@ const BASEURL_STORAGE = "goldrush.baseUrl";
 
 export function App() {
   const [prompt, setPrompt] = useState("");
+  const [gameType, setGameType] = useState<"babylon" | "onchain">("babylon");
   const [apiKey, setApiKey] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
   const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(BASEURL_STORAGE) ?? "");
   const [remember, setRemember] = useState(() => !!sessionStorage.getItem(KEY_STORAGE));
@@ -92,7 +98,7 @@ export function App() {
     setSubmitting(true);
     setErr(null);
     try {
-      const job = await postJob(p, k, b);
+      const job = await postJob(p, k, b, gameType);
       setActiveId(job.id);
       setActive(job);
     } catch (e) {
@@ -150,9 +156,35 @@ export function App() {
           若你用第三方中转站，把它的 Base URL 填上即可。
         </p>
 
+        <div style={S.engineRow}>
+          <button
+            type="button"
+            style={gameType === "babylon" ? S.engineOn : S.engineOff}
+            onClick={() => setGameType("babylon")}
+          >
+            网页游戏 (Babylon.js)
+          </button>
+          <button
+            type="button"
+            style={gameType === "onchain" ? S.engineOn : S.engineOff}
+            onClick={() => setGameType("onchain")}
+          >
+            链上游戏 (Solidity)
+          </button>
+        </div>
+        <p style={S.keyNote}>
+          {gameType === "onchain"
+            ? "链上游戏：规则/状态/胜负写进 Solidity 合约，自动编译+测试+部署到本地链验证，回合制为主。"
+            : "网页游戏：纯浏览器 Babylon.js 3D 游戏，支持实时玩法。"}
+        </p>
+
         <textarea
           style={S.textarea}
-          placeholder="描述你想要的游戏，例如：a small low-poly kart racer with 3 laps"
+          placeholder={
+            gameType === "onchain"
+              ? "描述一个回合制链上游戏，例如：a tic-tac-toe game on chain"
+              : "描述你想要的游戏，例如：a small low-poly kart racer with 3 laps"
+          }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={3}
@@ -273,6 +305,9 @@ const S: Record<string, React.CSSProperties> = {
   input: { width: "100%", boxSizing: "border-box", fontSize: 14, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontFamily: "ui-monospace, monospace" },
   checkboxRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555", marginTop: 8 },
   keyNote: { fontSize: 12, color: "#888", lineHeight: 1.5, margin: "8px 0 16px" },
+  engineRow: { display: "flex", gap: 8, marginBottom: 4 },
+  engineOn: { flex: 1, padding: "9px 12px", fontSize: 14, borderRadius: 8, border: "2px solid #2e7d32", background: "#e8f5e9", color: "#1b5e20", cursor: "pointer", fontWeight: 600 },
+  engineOff: { flex: 1, padding: "9px 12px", fontSize: 14, borderRadius: 8, border: "1px solid #ccc", background: "#fff", color: "#555", cursor: "pointer" },
   textarea: { width: "100%", boxSizing: "border-box", fontSize: 15, padding: 10, borderRadius: 8, border: "1px solid #ccc", resize: "vertical" },
   button: { marginTop: 10, padding: "10px 18px", fontSize: 15, background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", textDecoration: "none", display: "inline-block" },
   error: { marginTop: 12, padding: 10, background: "#fdecea", color: "#b71c1c", borderRadius: 8, whiteSpace: "pre-wrap" },

@@ -42,9 +42,21 @@ export function canTransition(from: JobState, to: JobState): boolean {
   return TRANSITIONS[from].includes(to);
 }
 
+/** Which generator engine a job targets. "babylon" = browser game; "onchain" =
+ *  fully on-chain game (Solidity contract + Babylon client). */
+export const GAME_TYPES = ["babylon", "onchain"] as const;
+export type GameType = (typeof GAME_TYPES)[number];
+export const DEFAULT_GAME_TYPE: GameType = "babylon";
+
+export function isGameType(v: unknown): v is GameType {
+  return typeof v === "string" && (GAME_TYPES as readonly string[]).includes(v);
+}
+
 export interface Job {
   id: string;
   prompt: string;
+  /** Which engine produced this job (defaults to babylon for back-compat). */
+  gameType: GameType;
   state: JobState;
   createdAt: number;
   startedAt: number | null;
@@ -76,4 +88,6 @@ export interface CreateJobRequest {
    * to the generation container as ANTHROPIC_BASE_URL. Also memory-only.
    */
   baseUrl?: string;
+  /** Which engine to target. Defaults to "babylon" when omitted. */
+  gameType?: GameType;
 }

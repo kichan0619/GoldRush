@@ -106,8 +106,11 @@ async function runJob(job: Job): Promise<void> {
   const tail: string[] = [];
   let lastStage: JobState = "provisioning";
 
+  // The on-chain engine needs a Foundry-equipped image; babylon uses the default.
+  const image = job.gameType === "onchain" ? config.onchainJobImage : config.jobImage;
+
   const handle = runContainer({
-    image: config.jobImage,
+    image,
     containerName,
     env: {
       ANTHROPIC_API_KEY: apiKey,
@@ -118,6 +121,7 @@ async function runJob(job: Job): Promise<void> {
         ? { ANTHROPIC_BASE_URL: baseUrl, ANTHROPIC_AUTH_TOKEN: apiKey }
         : {}),
       GODOPLAT_PROMPT: job.prompt,
+      GODOPLAT_ENGINE: job.gameType,
       GODOPLAT_MAX_TURNS: String(config.maxTurns),
       ...config.assetKeys,
     },

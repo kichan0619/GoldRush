@@ -25,6 +25,7 @@ export const TERMINAL: JobState[] = ["done", "failed", "timeout"];
 export interface Job {
   id: string;
   prompt: string;
+  gameType: "babylon" | "onchain";
   state: JobState;
   createdAt: number;
   startedAt: number | null;
