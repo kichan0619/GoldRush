@@ -38,6 +38,20 @@ const STAGE_LABEL: Record<JobState, string> = {
   timeout: "超时",
 };
 
+// One-click starter prompts so non-coders aren't staring at a blank box.
+const BABYLON_EXAMPLES: { label: string; prompt: string }[] = [
+  { label: "卡丁车", prompt: "a small low-poly kart racer with 3 laps and a lap timer" },
+  { label: "打砖块", prompt: "a colorful breakout game: paddle, ball, rows of bricks, score" },
+  { label: "贪吃蛇", prompt: "a 3D snake game on a grid; eat food to grow, game over on self-collision" },
+  { label: "平台跳跃", prompt: "a simple 3D platformer: run and jump across floating platforms to a goal flag" },
+  { label: "太空射击", prompt: "a top-down space shooter: move a ship, shoot incoming asteroids, score counter" },
+];
+const ONCHAIN_EXAMPLES: { label: string; prompt: string }[] = [
+  { label: "井字棋", prompt: "a two-player tic-tac-toe game fully on chain" },
+  { label: "四子棋", prompt: "a Connect Four game on chain: two players drop tokens, detect 4-in-a-row" },
+  { label: "石头剪刀布", prompt: "an on-chain rock-paper-scissors with commit-reveal for two players" },
+];
+
 // BYOK: the key is kept only in sessionStorage (cleared when the tab closes),
 // never localStorage, and is sent per-job. The server holds it in memory only.
 const KEY_STORAGE = "goldrush.anthropicKey";
@@ -209,6 +223,21 @@ export function App() {
             : "网页游戏：纯浏览器 Babylon.js 3D 游戏，支持实时玩法。"}
         </p>
 
+        <div style={S.exampleRow}>
+          <span style={S.exampleHint}>不知道写什么？点一个试试：</span>
+          {(gameType === "onchain" ? ONCHAIN_EXAMPLES : BABYLON_EXAMPLES).map((ex) => (
+            <button
+              key={ex.label}
+              type="button"
+              style={S.exampleChip}
+              onClick={() => setPrompt(ex.prompt)}
+              title={ex.prompt}
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
+
         <textarea
           style={S.textarea}
           placeholder={
@@ -367,6 +396,9 @@ const S: Record<string, React.CSSProperties> = {
   checkboxRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555", marginTop: 8 },
   keyNote: { fontSize: 12, color: "#888", lineHeight: 1.5, margin: "8px 0 16px" },
   engineRow: { display: "flex", gap: 8, marginBottom: 4 },
+  exampleRow: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "4px 0 10px" },
+  exampleHint: { fontSize: 13, color: "#888" },
+  exampleChip: { padding: "5px 12px", fontSize: 13, borderRadius: 999, border: "1px solid #c5cae9", background: "#f5f6ff", color: "#3949ab", cursor: "pointer" },
   engineOn: { flex: 1, padding: "9px 12px", fontSize: 14, borderRadius: 8, border: "2px solid #2e7d32", background: "#e8f5e9", color: "#1b5e20", cursor: "pointer", fontWeight: 600 },
   engineOff: { flex: 1, padding: "9px 12px", fontSize: 14, borderRadius: 8, border: "1px solid #ccc", background: "#fff", color: "#555", cursor: "pointer" },
   textarea: { width: "100%", boxSizing: "border-box", fontSize: 15, padding: 10, borderRadius: 8, border: "1px solid #ccc", resize: "vertical" },
