@@ -157,7 +157,7 @@ export function App() {
     <div style={S.page}>
       <header style={S.header}>
         <h1 style={{ margin: 0 }}>GoldRush Studio</h1>
-        <p style={S.sub}>一句话 → 可玩的 Babylon.js 浏览器游戏</p>
+        <p style={S.sub}>一句话生成可玩游戏 · 不会写代码也能做 · 生成后用大白话继续改</p>
       </header>
 
       <section style={S.card}>
@@ -288,7 +288,14 @@ export function App() {
       <section>
         <h2 style={S.h2}>画廊</h2>
         {gallery.filter((j) => j.state === "done").length === 0 ? (
-          <p style={S.muted}>还没有完成的游戏。提交一个 prompt 试试。</p>
+          <div style={S.empty}>
+            <div style={S.emptyIcon}>🎮</div>
+            <p style={S.emptyTitle}>还没有游戏</p>
+            <p style={S.muted}>
+              在上面填好 key、点一个示例（或自己写一句），点「生成游戏」——
+              做好的游戏会出现在这里，可以直接玩、分享、或继续修改。
+            </p>
+          </div>
         ) : (
           <div style={S.grid}>
             {gallery
@@ -435,6 +442,9 @@ const S: Record<string, React.CSSProperties> = {
   error: { marginTop: 12, padding: 10, background: "#fdecea", color: "#b71c1c", borderRadius: 8, whiteSpace: "pre-wrap" },
   h2: { fontSize: 18 },
   muted: { color: "#888", fontSize: 14 },
+  empty: { textAlign: "center", padding: "36px 20px", background: "#fafafa", border: "1px dashed #ddd", borderRadius: 12 },
+  emptyIcon: { fontSize: 40, lineHeight: 1 },
+  emptyTitle: { fontSize: 16, fontWeight: 600, color: "#555", margin: "10px 0 4px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 },
   tile: { border: "1px solid #e0e0e0", borderRadius: 10, overflow: "hidden", textDecoration: "none", color: "#222", background: "#fff" },
   thumb: { width: "100%", height: 140, objectFit: "cover", display: "block" },
