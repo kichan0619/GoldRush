@@ -237,13 +237,14 @@ export function App() {
             type="button"
             style={gameType === "onchain" ? S.engineOn : S.engineOff}
             onClick={() => setGameType("onchain")}
+            title="实验中：需要额外的链上沙箱镜像，尚未随平台默认提供"
           >
-            链上游戏 (Solidity)
+            链上游戏 (Solidity) · 实验
           </button>
         </div>
         <p style={S.keyNote}>
           {gameType === "onchain"
-            ? "链上游戏：规则/状态/胜负写进 Solidity 合约，自动编译+测试+部署到本地链验证，回合制为主。"
+            ? "链上游戏（实验）：规则/状态/胜负写进 Solidity 合约。目前需要单独构建链上沙箱镜像才能跑通，平台默认镜像不含它——先了解方向即可，建议用「网页游戏」体验完整流程。"
             : "网页游戏：纯浏览器 Babylon.js 3D 游戏，支持实时玩法。"}
         </p>
 
@@ -276,9 +277,9 @@ export function App() {
         <button
           style={S.button}
           onClick={submit}
-          disabled={submitting || !prompt.trim() || !apiKey.trim()}
+          disabled={submitting || !prompt.trim() || !apiKey.trim() || gameType === "onchain"}
         >
-          {submitting ? "提交中…" : "生成游戏"}
+          {submitting ? "提交中…" : gameType === "onchain" ? "链上模式暂不可用" : "生成游戏"}
         </button>
         {err && <div style={S.error}>{err}</div>}
       </section>
@@ -329,6 +330,17 @@ function ActivePanel({
   const [editPrompt, setEditPrompt] = useState("");
   const currentIdx = PIPELINE.indexOf(job.state);
   const failed = job.state === "failed" || job.state === "timeout";
+  const running = !failed && job.state !== "done";
+
+  // Live elapsed timer while running — reassures the user it isn't stuck.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [running]);
+  const elapsedS = Math.max(0, Math.floor((now - job.createdAt) / 1000));
+  const elapsedText = `${Math.floor(elapsedS / 60)} 分 ${elapsedS % 60} 秒`;
   return (
     <section style={S.card}>
       <div style={S.activePrompt}>“{job.prompt}”</div>
@@ -354,6 +366,12 @@ function ActivePanel({
       {failed && (
         <div style={S.error}>
           {STAGE_LABEL[job.state]}：{job.error ?? "未知错误"}
+        </div>
+      )}
+
+      {running && (
+        <div style={S.elapsed}>
+          已生成 <b>{elapsedText}</b> · AI 写游戏通常要 15–20 分钟,请耐心等,别关页面
         </div>
       )}
 
@@ -443,6 +461,7 @@ const S: Record<string, React.CSSProperties> = {
   h2: { fontSize: 18 },
   muted: { color: "#888", fontSize: 14 },
   empty: { textAlign: "center", padding: "36px 20px", background: "#fafafa", border: "1px dashed #ddd", borderRadius: 12 },
+  elapsed: { marginTop: 10, padding: "8px 12px", background: "#fff8e1", border: "1px solid #ffe082", borderRadius: 8, fontSize: 13, color: "#6d4c41" },
   emptyIcon: { fontSize: 40, lineHeight: 1 },
   emptyTitle: { fontSize: 16, fontWeight: 600, color: "#555", margin: "10px 0 4px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 },
