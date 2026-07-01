@@ -182,6 +182,30 @@ export function App() {
           <span>在本标签页记住（关闭标签页即清除）</span>
         </label>
 
+        <details style={S.help}>
+          <summary style={S.helpSummary}>第一次用？怎么获取 / 填写 key</summary>
+          <div style={S.helpBody}>
+            <p style={S.helpP}>
+              这里需要一个 <b>Anthropic API key</b>（生成游戏时调用 Claude 用的，费用走你自己的账号）。
+            </p>
+            <ol style={S.helpList}>
+              <li>
+                官方：登录{" "}
+                <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
+                  console.anthropic.com
+                </a>{" "}
+                → API Keys → Create Key，复制 <code>sk-ant-…</code> 填到上面。
+              </li>
+              <li>
+                用第三方中转站：把中转站给你的 key 填上面，并在下方「中转站 / Base URL」填它的地址。
+              </li>
+            </ol>
+            <p style={S.helpP}>
+              放心：key 只用于本次生成、仅存在浏览器和服务器内存里，<b>不会上传、不写数据库、不进日志</b>。
+            </p>
+          </div>
+        </details>
+
         <label style={{ ...S.label, marginTop: 14 }} htmlFor="baseUrl">
           中转站 / 自定义 Base URL（可选）
         </label>
@@ -394,6 +418,11 @@ const S: Record<string, React.CSSProperties> = {
   label: { display: "block", fontSize: 13, fontWeight: 600, color: "#444", marginBottom: 6 },
   input: { width: "100%", boxSizing: "border-box", fontSize: 14, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontFamily: "ui-monospace, monospace" },
   checkboxRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555", marginTop: 8 },
+  help: { marginTop: 10, fontSize: 13 },
+  helpSummary: { cursor: "pointer", color: "#3949ab", userSelect: "none" },
+  helpBody: { marginTop: 8, padding: 12, background: "#f5f6ff", border: "1px solid #e0e3f5", borderRadius: 8, color: "#444" },
+  helpP: { margin: "6px 0", lineHeight: 1.6 },
+  helpList: { margin: "6px 0", paddingLeft: 20, lineHeight: 1.7 },
   keyNote: { fontSize: 12, color: "#888", lineHeight: 1.5, margin: "8px 0 16px" },
   engineRow: { display: "flex", gap: 8, marginBottom: 4 },
   exampleRow: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "4px 0 10px" },
