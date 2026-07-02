@@ -5,15 +5,18 @@ import {
   claimNextQueued,
   patchJob,
   setState,
+  getJob,
 } from "../db/store.js";
 import type { Job, JobState } from "../shared/job.js";
-import { takeKey } from "../shared/secret-store.js";
+import { isTerminal } from "../shared/job.js";
+import { takeKey, dropKey } from "../shared/secret-store.js";
 import { redact } from "../shared/redact.js";
 import {
   copyOut,
   dockerAvailable,
   removeContainer,
   runContainer,
+  type RunHandle,
 } from "./docker.js";
 
 /**
@@ -37,6 +40,30 @@ const STAGE_TO_STATE: Record<string, JobState> = {
 
 let running = false;
 let stopped = false;
+
+// Single-concurrency, so we track just the one in-flight job to support cancel.
+let current: { id: string; handle: RunHandle } | null = null;
+const canceled = new Set<string>();
+
+/**
+ * Cancel a job. If it's the one currently running, kill its container (the run
+ * loop then finalizes it as canceled). If it's still queued, mark it failed so
+ * the worker skips it. Returns true if the job was found and acted on.
+ */
+export function cancelJob(id: string): boolean {
+  const job = getJob(id);
+  if (!job || isTerminal(job.state)) return false;
+  canceled.add(id);
+  if (current && current.id === id) {
+    current.handle.kill(); // container dies → runJob sees it and finalizes as canceled
+    return true;
+  }
+  // Queued but not yet running: fail it directly so the loop won't pick it up.
+  patchJob(id, { finishedAt: Date.now() });
+  forceFail(id, "已取消");
+  dropKey(id);
+  return true;
+}
 
 export function startWorker(): void {
   if (running) return;
@@ -168,8 +195,20 @@ async function runJob(job: Job): Promise<void> {
     handle.kill();
   }, config.jobTimeoutMs);
 
+  // Register as the in-flight job so cancelJob() can kill this container.
+  current = { id: job.id, handle };
+
   const exitCode = await handle.done;
   clearTimeout(timer);
+  current = null;
+
+  // User cancel takes precedence over the resulting non-zero exit.
+  if (canceled.has(job.id)) {
+    canceled.delete(job.id);
+    finalize(job.id, "failed", "已取消");
+    removeContainer(containerName);
+    return;
+  }
 
   if (timedOut) {
     finalize(job.id, "timeout", "wall-clock timeout exceeded");

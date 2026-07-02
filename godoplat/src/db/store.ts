@@ -183,3 +183,10 @@ export function reapOrphans(): number {
     .run({ now: Date.now() });
   return res.changes;
 }
+
+/** Delete a job row. Returns true if a row was removed. Caller is responsible
+ *  for cleaning up on-disk artifacts and any in-memory secret. */
+export function deleteJob(id: string): boolean {
+  const res = getDb().prepare(`DELETE FROM jobs WHERE id = ?`).run(id);
+  return res.changes > 0;
+}

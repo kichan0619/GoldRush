@@ -8,11 +8,12 @@ import {
   getJob,
   listJobs,
   reapOrphans,
+  deleteJob,
 } from "../db/store.js";
 import type { CreateJobRequest } from "../shared/job.js";
-import { isGameType, DEFAULT_GAME_TYPE } from "../shared/job.js";
-import { putKey } from "../shared/secret-store.js";
-import { startWorker } from "../worker/index.js";
+import { isGameType, DEFAULT_GAME_TYPE, isTerminal } from "../shared/job.js";
+import { putKey, dropKey } from "../shared/secret-store.js";
+import { startWorker, cancelJob } from "../worker/index.js";
 
 const MAX_PROMPT_LEN = 500;
 
@@ -97,6 +98,34 @@ export function buildServer() {
 
   app.get("/api/jobs", async () => {
     return listJobs();
+  });
+
+  // Cancel a running/queued job (keeps the row, marks it canceled/failed).
+  app.post<{ Params: { id: string } }>("/api/jobs/:id/cancel", async (req, reply) => {
+    const job = getJob(req.params.id);
+    if (!job) return reply.code(404).send({ error: "not found" });
+    if (isTerminal(job.state)) {
+      return reply.code(409).send({ error: "job already finished" });
+    }
+    cancelJob(job.id);
+    return reply.send({ ok: true });
+  });
+
+  // Delete a job entirely: cancel if still running, then drop the row, its
+  // in-memory key, and its on-disk artifacts.
+  app.delete<{ Params: { id: string } }>("/api/jobs/:id", async (req, reply) => {
+    const job = getJob(req.params.id);
+    if (!job) return reply.code(404).send({ error: "not found" });
+    if (!isTerminal(job.state)) cancelJob(job.id);
+    dropKey(job.id);
+    deleteJob(job.id);
+    // Best-effort artifact cleanup; the row is already gone either way.
+    try {
+      fs.rmSync(jobDir(job.id), { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+    return reply.send({ ok: true });
   });
 
   // --- Static: finished games + media, served per job ----------------------

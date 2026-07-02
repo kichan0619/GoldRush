@@ -47,6 +47,14 @@ test("parentJobId defaults null; persists when editing a prior game", () => {
   assert.equal(store.getJob(edit.id)!.parentJobId, fresh.id);
 });
 
+test("deleteJob removes the row; returns false for unknown id", () => {
+  const j = store.createJob("throwaway game");
+  assert.ok(store.getJob(j.id));
+  assert.equal(store.deleteJob(j.id), true);
+  assert.equal(store.getJob(j.id), null);
+  assert.equal(store.deleteJob("nope-not-real"), false);
+});
+
 test("claimNextQueued atomically moves oldest queued -> provisioning", () => {
   const a = store.createJob("first");
   const claimed = store.claimNextQueued();

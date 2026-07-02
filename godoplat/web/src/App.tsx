@@ -27,6 +27,14 @@ async function fetchJobs(): Promise<Job[]> {
   return res.ok ? res.json() : [];
 }
 
+async function deleteJobReq(id: string): Promise<void> {
+  await fetch(`/api/jobs/${id}`, { method: "DELETE" });
+}
+
+async function cancelJobReq(id: string): Promise<void> {
+  await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
+}
+
 const STAGE_LABEL: Record<JobState, string> = {
   queued: "排队中",
   provisioning: "起容器",
@@ -71,6 +79,22 @@ export function App() {
 
   const refreshGallery = useCallback(async () => {
     setGallery(await fetchJobs());
+  }, []);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (!window.confirm("删除这个游戏？此操作不可恢复。")) return;
+      await deleteJobReq(id);
+      setActive((a) => (a && a.id === id ? null : a));
+      setActiveId((cur) => (cur === id ? null : cur));
+      void refreshGallery();
+    },
+    [refreshGallery],
+  );
+
+  const handleCancel = useCallback(async (id: string) => {
+    await cancelJobReq(id);
+    // The active-job poll will pick up the state change.
   }, []);
 
   useEffect(() => {
@@ -284,7 +308,15 @@ export function App() {
         {err && <div style={S.error}>{err}</div>}
       </section>
 
-      {active && <ActivePanel job={active} onEdit={submitEdit} editing={submitting} />}
+      {active && (
+        <ActivePanel
+          job={active}
+          onEdit={submitEdit}
+          editing={submitting}
+          onCancel={handleCancel}
+          onDelete={handleDelete}
+        />
+      )}
 
       <section>
         <h2 style={S.h2}>画廊</h2>
@@ -302,14 +334,23 @@ export function App() {
             {gallery
               .filter((j) => j.state === "done")
               .map((j) => (
-                <a key={j.id} href={j.gamePath ?? "#"} style={S.tile} target="_blank" rel="noreferrer">
-                  {j.thumbnailPath ? (
-                    <img src={j.thumbnailPath} alt={j.prompt} style={S.thumb} />
-                  ) : (
-                    <div style={{ ...S.thumb, ...S.thumbBlank }}>无缩略图</div>
-                  )}
-                  <div style={S.tilePrompt}>{j.prompt}</div>
-                </a>
+                <div key={j.id} style={S.tileWrap}>
+                  <a href={j.gamePath ?? "#"} style={S.tile} target="_blank" rel="noreferrer">
+                    {j.thumbnailPath ? (
+                      <img src={j.thumbnailPath} alt={j.prompt} style={S.thumb} />
+                    ) : (
+                      <div style={{ ...S.thumb, ...S.thumbBlank }}>无缩略图</div>
+                    )}
+                    <div style={S.tilePrompt}>{j.prompt}</div>
+                  </a>
+                  <button
+                    style={S.tileDelete}
+                    title="删除这个游戏"
+                    onClick={() => handleDelete(j.id)}
+                  >
+                    删除
+                  </button>
+                </div>
               ))}
           </div>
         )}
@@ -322,10 +363,14 @@ function ActivePanel({
   job,
   onEdit,
   editing,
+  onCancel,
+  onDelete,
 }: {
   job: Job;
   onEdit: (parentJobId: string, editPrompt: string) => void;
   editing: boolean;
+  onCancel: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const [editPrompt, setEditPrompt] = useState("");
   const currentIdx = PIPELINE.indexOf(job.state);
@@ -374,6 +419,19 @@ function ActivePanel({
           已生成 <b>{elapsedText}</b> · AI 写游戏通常要 15–20 分钟,请耐心等,别关页面
         </div>
       )}
+
+      <div style={S.row}>
+        {running && (
+          <button style={S.dangerBtn} onClick={() => onCancel(job.id)}>
+            取消生成
+          </button>
+        )}
+        {(failed || job.state === "done") && (
+          <button style={S.dangerBtn} onClick={() => onDelete(job.id)}>
+            删除
+          </button>
+        )}
+      </div>
 
       {job.state === "done" && job.gamePath && (
         <div>
@@ -465,7 +523,10 @@ const S: Record<string, React.CSSProperties> = {
   emptyIcon: { fontSize: 40, lineHeight: 1 },
   emptyTitle: { fontSize: 16, fontWeight: 600, color: "#555", margin: "10px 0 4px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 },
-  tile: { border: "1px solid #e0e0e0", borderRadius: 10, overflow: "hidden", textDecoration: "none", color: "#222", background: "#fff" },
+  tile: { display: "block", border: "1px solid #e0e0e0", borderRadius: 10, overflow: "hidden", textDecoration: "none", color: "#222", background: "#fff" },
+  tileWrap: { position: "relative" },
+  tileDelete: { position: "absolute", top: 6, right: 6, padding: "3px 8px", fontSize: 12, background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" },
+  dangerBtn: { marginTop: 12, padding: "8px 16px", fontSize: 14, background: "#fff", color: "#c62828", border: "1px solid #ef9a9a", borderRadius: 8, cursor: "pointer" },
   thumb: { width: "100%", height: 140, objectFit: "cover", display: "block" },
   thumbBlank: { display: "flex", alignItems: "center", justifyContent: "center", background: "#eee", color: "#999" },
   tilePrompt: { padding: 10, fontSize: 13, lineHeight: 1.4 },
